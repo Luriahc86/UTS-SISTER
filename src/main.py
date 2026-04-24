@@ -14,20 +14,12 @@ from src.models import Event, PublishResponse, StatsResponse
 from src.queue import EventQueue
 from src.stats import StatsCounter
 
-# ------------------------------------------------------------------
-# Penyiapan Logging
-# ------------------------------------------------------------------
-
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
-
-# ------------------------------------------------------------------
-# Singleton tingkat aplikasi
-# ------------------------------------------------------------------
 
 DB_PATH = Path(os.getenv("DEDUP_DB_PATH", "/app/data/dedup.db"))
 
@@ -37,16 +29,10 @@ stats = StatsCounter()
 _stop_event = asyncio.Event()
 _consumer_task: asyncio.Task | None = None
 
-
-# ------------------------------------------------------------------
-# Siklus Hidup Aplikasi (Lifespan)
-# ------------------------------------------------------------------
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global _consumer_task, _stop_event
 
-    # Proses Startup (Mulai berjalan)
     _stop_event = asyncio.Event()
     await dedup_store.init()
     _consumer_task = asyncio.create_task(
@@ -57,7 +43,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
 
-    # Proses Shutdown — mengosongkan antrean sebelum keluar
     logger.info("Shutting down — draining queue (size=%d)", event_queue.size)
     _stop_event.set()
     if _consumer_task:
@@ -65,21 +50,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Aggregator service stopped")
 
 
-# ------------------------------------------------------------------
-# Aplikasi FastAPI
-# ------------------------------------------------------------------
-
 app = FastAPI(
     title="UTS Pub-Sub Log Aggregator",
     description="Agregator event idempoten dengan penyimpanan deduplikasi di SQLite.",
     version="1.0.0",
     lifespan=lifespan,
 )
-
-
-# ------------------------------------------------------------------
-# Metode POST /publish
-# ------------------------------------------------------------------
 
 @app.post("/publish", response_model=PublishResponse, status_code=202)
 async def publish(request: Request) -> PublishResponse:
@@ -109,11 +85,6 @@ async def publish(request: Request) -> PublishResponse:
 
     return PublishResponse(accepted=accepted, rejected=rejected)
 
-
-# ------------------------------------------------------------------
-# Metode GET /events
-# ------------------------------------------------------------------
-
 @app.get("/events")
 async def get_events(
     topic: str | None = Query(default=None, description="Menyaring (filter) event berdasarkan topik"),
@@ -123,11 +94,6 @@ async def get_events(
     """
     events = await dedup_store.get_events(topic=topic)
     return JSONResponse(content={"events": events, "count": len(events)})
-
-
-# ------------------------------------------------------------------
-# Metode GET /stats
-# ------------------------------------------------------------------
 
 @app.get("/stats", response_model=StatsResponse)
 async def get_stats() -> StatsResponse:
@@ -141,19 +107,9 @@ async def get_stats() -> StatsResponse:
         uptime_seconds=round(stats.uptime_seconds, 3),
     )
 
-
-# ------------------------------------------------------------------
-# Pengecekan Kesehatan (Health check)
-# ------------------------------------------------------------------
-
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "queue_size": event_queue.size}
-
-
-# ------------------------------------------------------------------
-# Titik Masuk Utama (Entrypoint)
-# ------------------------------------------------------------------
 
 if __name__ == "__main__":
     import uvicorn

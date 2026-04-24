@@ -14,18 +14,9 @@ DB_PATH = Path("/app/data/dedup.db")
 
 
 class DedupStore:
-    """
-    Penyimpanan deduplikasi (penghapusan data ganda) berbasis SQLite.
-    Semua pemanggilan sqlite3 yang bersifat memblokir (blocking) dialihkan melalui asyncio.to_thread
-    sehingga event loop tidak akan pernah terblokir atau terganggu.
-    """
 
     def __init__(self, db_path: Path = DB_PATH) -> None:
         self.db_path = db_path
-
-    # ------------------------------------------------------------------
-    # Inisialisasi Database
-    # ------------------------------------------------------------------
 
     async def init(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -50,10 +41,6 @@ class DedupStore:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_topic ON processed_events (topic)")
             conn.commit()
 
-    # ------------------------------------------------------------------
-    # API untuk Event Tunggal (digunakan untuk pengujian + pemrosesan satu event)
-    # ------------------------------------------------------------------
-
     async def is_duplicate(self, topic: str, event_id: str) -> bool:
         return await asyncio.to_thread(self._check_exists, topic, event_id)
 
@@ -61,20 +48,11 @@ class DedupStore:
         now = datetime.now(timezone.utc).isoformat()
         await asyncio.to_thread(self._insert, topic, event_id, now)
 
-    # ------------------------------------------------------------------
-    # API Massal (Bulk) — satu panggilan ke DB untuk seluruh satu batch kecil
-    # ------------------------------------------------------------------
 
     async def bulk_check_and_insert(
         self, events: list["Event"]
     ) -> tuple[list["Event"], int]:
-        """
-        Menerima daftar event, lalu mengembalikan:
-          - new_events: event yang belum pernah diproses (dimasukkan ke DB secara atomik)
-          - dup_count:  jumlah data duplikat yang terdeteksi
 
-        Menggunakan satu transaksi tunggal dengan INSERT OR IGNORE agar bersifat atomik (tuntas sekaligus).
-        """
         return await asyncio.to_thread(self._bulk_process, events)
 
     def _bulk_process(
@@ -89,7 +67,6 @@ class DedupStore:
             conn.execute("PRAGMA synchronous=NORMAL")
 
             for event in events:
-                # Memeriksa apakah event sudah ada di database
                 row = conn.execute(
                     "SELECT 1 FROM processed_events WHERE topic=? AND event_id=?",
                     (event.topic, event.event_id),
@@ -111,19 +88,11 @@ class DedupStore:
 
         return new_events, dup_count
 
-    # ------------------------------------------------------------------
-    # Fungsi pembantu untuk Query
-    # ------------------------------------------------------------------
-
     async def get_events(self, topic: str | None = None) -> list[dict]:
         return await asyncio.to_thread(self._fetch_events, topic)
 
     async def get_topics(self) -> list[str]:
         return await asyncio.to_thread(self._fetch_topics)
-
-    # ------------------------------------------------------------------
-    # Fungsi pembantu sinkronus (berjalan langsung secara berurutan)
-    # ------------------------------------------------------------------
 
     def _check_exists(self, topic: str, event_id: str) -> bool:
         with sqlite3.connect(self.db_path) as conn:
@@ -145,7 +114,7 @@ class DedupStore:
                 )
                 conn.commit()
             except sqlite3.IntegrityError:
-                # Data tersebut sudah ada di tabel sehingga diabaikan saja
+
                 logger.debug("IntegrityError saat insert — data sudah ada: %s/%s", topic, event_id)
 
     def _fetch_events(self, topic: str | None) -> list[dict]:

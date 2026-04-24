@@ -4,13 +4,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class StatsCounter:
-    """
-    Pencatat statistik pergerakan secara in-memory yang mengadopsi pola thread-safe tingkat menengah.
-    Seluruh perubahan dilakukan pada sebuah tugas consumer asyncio yang sama,
-    jadi tidak diharuskan menggunakan metode penguncian mutiplikasi (lock). Pembacaan oleh fungsi endpoint akan aman terjadi
-    lantaran GIL di CPython membuat proses pembacaan pada nilai integer sudah sepenuhnya atomik.
-    """
-
+    
     received: int = 0
     unique_processed: int = 0
     duplicate_dropped: int = 0
@@ -30,7 +24,6 @@ class StatsCounter:
         return time.monotonic() - self._start_time
 
     def reset(self) -> None:
-        """Mereset semua fungsi penghitungan serta jam mula uptime (cocok diterapkan pasa saat testing)"""
         self.received = 0
         self.unique_processed = 0
         self.duplicate_dropped = 0

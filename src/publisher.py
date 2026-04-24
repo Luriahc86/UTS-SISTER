@@ -1,15 +1,3 @@
-"""
-Skrip publisher mandiri (standalone) untuk simulasi sistem log.
-
-Penggunaan (di dalam container):
-    python -m src.publisher [--host HOST] [--port PORT] [--count N] [--topic TOPIC]
-
-Perilaku (Behaviour):
-    • Mengirim `count` event unik ke agregator
-    • Kemudian mengirim ulang 10 event pertama (simulasi pengiriman at-least-once / setidaknya sekali)
-    • Melaporkan total yang diterima/ditolak
-"""
-
 import argparse
 import asyncio
 import logging
@@ -87,7 +75,7 @@ def main() -> None:
     parser.add_argument("--host", default="aggregator", help="Host agregator")
     parser.add_argument("--port", type=int, default=8080, help="Port agregator")
     parser.add_argument("--count", type=int, default=100, help="Jumlah event unik yang akan dikirim")
-    parser.add_argument("--topic", default="test-topic", help="Topik event")
+    parser.add_argument("--topic", default="Sister Enak", help="Topik event")
     parser.add_argument("--batch-size", type=int, default=50, help="Event per permintaan POST")
     args = parser.parse_args()
 
